@@ -37,7 +37,7 @@ namespace DebugStuff
 
         public void Update()
         {
-            if (!HighLogic.LoadedSceneIsEditor || !HighLogic.LoadedSceneIsFlight)
+            if (!HighLogic.LoadedSceneIsEditor && !HighLogic.LoadedSceneIsFlight)
             {
                 if (window != null)
                     window.gameObject.SetActive(false);
