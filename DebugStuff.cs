@@ -1,7 +1,9 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Text;
 using KSP.UI;
 using UnityEngine;
+using UnityEngine.Audio;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -11,14 +13,14 @@ namespace DebugStuff
     [KSPAddon(KSPAddon.Startup.EveryScene, true)]
     internal class DebugStuff : MonoBehaviour
     {
-        private Part currentHoverPart;
-
         private int flip;
-
         private RaycastHit hit;
-        private Part previousHoverPart;
+
+        private GameObject currentHoverPart;
+        private GameObject previousHoverPart;
         private StringBuilder sb = new StringBuilder();
         private bool showUI;
+        private Mode mode;
 
         private GUIStyle styleTransform;
         //private GUIStyle styleWindow;
@@ -27,8 +29,18 @@ namespace DebugStuff
         private static RectTransform window;
         private static Vector2 originalLocalPointerPosition;
         private static Vector3 originalPanelLocalPosition;
+        private static Text activeMode;
         private static Text partTree;
         private static Font monoSpaceFont;
+
+        
+
+        private enum Mode
+        {
+            PART,
+            UI,
+            OBJECT
+        }
 
         public void Awake()
         {
@@ -55,8 +67,31 @@ namespace DebugStuff
                 if (UIMasterController.Instance != null)
                 {
                     InitFont();
-                    window = UICreateWindow(UIMasterController.Instance.appCanvas.gameObject);
-                    //print("Creating the UI " + (window == null) + " " + showUI);
+                    //print("Creating the UI");
+
+                    GameObject canvasObj = this.gameObject;
+
+                    // Create a Canvas for the app to avoid hitting the vertex limit 
+                    // on the stock canvas.
+                    // Clone the stock one instead ?
+
+                    canvasObj.layer = LayerMask.NameToLayer("UI");
+                    RectTransform canvasRect = canvasObj.AddComponent<RectTransform>();
+                    Canvas countersCanvas = canvasObj.AddComponent<Canvas>();
+                    countersCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                    countersCanvas.pixelPerfect = true;
+                    countersCanvas.worldCamera = UIMasterController.Instance.appCanvas.worldCamera;
+                    countersCanvas.planeDistance = 625;
+
+                    CanvasScaler scaler = canvasObj.AddComponent<CanvasScaler>();
+                    scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
+                    scaler.scaleFactor = 1;
+                    scaler.referencePixelsPerUnit = 100;
+
+                    GraphicRaycaster rayCaster = canvasObj.AddComponent<GraphicRaycaster>();
+                    
+                    window = UICreateWindow(canvasObj);
+                    //print("Created the UI");
                 }
                 return;
             }
@@ -67,17 +102,29 @@ namespace DebugStuff
             {
                 currentHoverPart = CheckForPartUnderCursor();
 
-                if (currentHoverPart && currentHoverPart != previousHoverPart)
+                if (currentHoverPart && (currentHoverPart != previousHoverPart))
                 {
                     previousHoverPart = currentHoverPart;
 
                     DumpPartHierarchy(currentHoverPart);
 
-                    partTree.text = sb.ToString();
+                    // A canvas can not have more than 65000 vertex
+                    // and a char is 4 vertex
+                    int limit = 16000;
+                    // not exactly amsome but it works
+
+                    string tree = sb.ToString();
+
+                    if (tree.Length > limit)
+                    {
+                        partTree.text = sb.ToString().Substring(0, limit) + "\n[Truncated]";
+                    }
+                    else
+                    {
+                        partTree.text = tree;
+                    }
                 }
             }
-
-
         }
 
         public void InitFont()
@@ -119,10 +166,10 @@ namespace DebugStuff
                 DrawColliders(currentHoverPart.gameObject);
         }
 
-        private void DumpPartHierarchy(Part p)
+        private void DumpPartHierarchy(GameObject p)
         {
             sb.Length = 0;
-            DumpGameObjectChilds(p.gameObject, "", sb);
+            DumpGameObjectChilds(p, "", sb);
         }
 
         // A bit messy. The code could be simplified by beeing smarter with when I add
@@ -177,20 +224,72 @@ namespace DebugStuff
             }
         }
 
-        private Part CheckForPartUnderCursor()
+        private GameObject CheckForPartUnderCursor()
         {
-            if (EventSystem.current.IsPointerOverGameObject())
-            {
-                return null;
-            }
-            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-            if (!Physics.Raycast(ray, out hit, 500f, 2097157))
-            {
-                return null;
-            }
-            Part componentUpwards = hit.collider.gameObject.GetComponentUpwards<Part>();
+            //if (EventSystem.current.IsPointerOverGameObject())
+            //{
+            //    return null;
+            //}
 
-            return componentUpwards;
+
+            //1000000000000000000101
+
+            if (mode == Mode.UI)
+            {
+                var pointer = new PointerEventData(EventSystem.current);
+
+                pointer.position = Input.mousePosition;
+                //pointer.position = Camera.main.ScreenToViewportPoint(Input.mousePosition);
+
+                var raycastResults = new List<RaycastResult>();
+                EventSystem.current.RaycastAll(pointer, raycastResults);
+
+                //print(pointer.position.ToString("F3"));
+
+                //if (!Physics2D.Raycast(ray, out hit, 500f, layerMask))
+                if (raycastResults.Count == 0)
+                {
+                    //print("Nothing");
+                    return null;
+                }
+
+                //print("Found " + raycastResults.Count); 
+
+                GameObject obj = raycastResults[0].gameObject;
+                //print(obj.name);
+
+                while (obj.transform.parent && !obj.transform.parent.gameObject.GetComponent<Canvas>())
+                {
+                    obj = obj.transform.parent.gameObject;
+                    //print(obj.name);
+                }
+                return obj;
+            }
+            else
+            {
+                Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+                int layerMask = mode == Mode.PART ? LayerMask.NameToLayer("Default") | LayerMask.NameToLayer("Ignore Raycast") | LayerMask.NameToLayer("Part Triggers") : ~LayerMask.NameToLayer("UI");
+
+                if (!Physics.Raycast(ray, out hit, 500f, layerMask))
+                {
+                    //print("Nothing");
+                    return null;
+                }
+
+                switch (mode)
+                {
+                    case Mode.PART:
+                        Part part = hit.collider.gameObject.GetComponentUpwards<Part>();
+                        return part.gameObject;
+                        
+                    case Mode.OBJECT:
+                        return hit.collider.gameObject;
+                }
+
+            }
+
+            return null;
+
         }
 
         private void DrawColliders(GameObject go)
@@ -231,7 +330,8 @@ namespace DebugStuff
                     break;
             }
 
-            GUI.Label(new Rect(point.x, Screen.currentResolution.height - point.y, size.x, size.y), go.transform.name, styleTransform);
+            if (mode != Mode.UI)
+                GUI.Label(new Rect(point.x, Screen.currentResolution.height - point.y, size.x, size.y), go.transform.name, styleTransform);
 
             flip++;
 
@@ -309,6 +409,27 @@ namespace DebugStuff
 
             addButton(panelPos.gameObject, "Dump to log", () => { print(sb.ToString()); });
 
+            activeMode = addText(panelPos.gameObject, "");
+
+            activeMode.text = mode.ToString();
+
+            addButton(panelPos.gameObject, "Mode", () =>
+            {
+                switch (mode)
+                {
+                    case Mode.PART:
+                        mode = Mode.UI;
+                        break;
+                    case Mode.UI:
+                        mode = Mode.OBJECT;
+                        break;
+                    case Mode.OBJECT:
+                        mode = Mode.PART;
+                        break;
+                }
+                activeMode.text = mode.ToString();
+            });
+
             partTree = addText(panelPos.gameObject, "");
             partTree.font = monoSpaceFont;
             partTree.fontSize = 10;
@@ -322,7 +443,8 @@ namespace DebugStuff
             GameObject buttonObject = new GameObject("Button");
 
 
-            buttonObject.layer = LayerMask.NameToLayer("UI"); ;
+            buttonObject.layer = LayerMask.NameToLayer("UI");
+            ;
 
             RectTransform trans = buttonObject.AddComponent<RectTransform>();
             trans.localScale = new Vector3(1.0f, 1.0f, 1.0f);
@@ -330,7 +452,7 @@ namespace DebugStuff
 
             Image image = buttonObject.AddComponent<Image>();
             image.color = new Color(0.5f, 0f, 0, 0.5f);
-            
+
             Button button = buttonObject.AddComponent<Button>();
             button.interactable = true;
             button.onClick.AddListener(click);
@@ -382,7 +504,7 @@ namespace DebugStuff
         {
             //print("OnInitializePotentialDrag");
             originalPanelLocalPosition = window.localPosition;
-            RectTransformUtility.ScreenPointToLocalPointInRectangle((RectTransform)window.parent.transform, e.position, e.pressEventCamera, out originalLocalPointerPosition);
+            RectTransformUtility.ScreenPointToLocalPointInRectangle((RectTransform) window.parent.transform, e.position, e.pressEventCamera, out originalLocalPointerPosition);
         }
 
         private void OnBeginDrag(PointerEventData e)
@@ -393,7 +515,7 @@ namespace DebugStuff
         private void OnDrag(PointerEventData e)
         {
             Vector2 localPointerPosition;
-            if (RectTransformUtility.ScreenPointToLocalPointInRectangle((RectTransform)window.parent.transform, e.position, e.pressEventCamera, out localPointerPosition))
+            if (RectTransformUtility.ScreenPointToLocalPointInRectangle((RectTransform) window.parent.transform, e.position, e.pressEventCamera, out localPointerPosition))
             {
                 Vector3 offsetToOriginal = localPointerPosition - originalLocalPointerPosition;
                 window.localPosition = originalPanelLocalPosition + offsetToOriginal;
@@ -424,6 +546,9 @@ namespace DebugStuff
             return panelRect;
         }
 
-
+        public new static void print(object message)
+        {
+            MonoBehaviour.print("[DebugStuff] " + message);
+        }
     }
 }
