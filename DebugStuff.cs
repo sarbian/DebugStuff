@@ -154,7 +154,7 @@ namespace DebugStuff
             if (styleTransform == null)
             {
                 styleTransform = new GUIStyle(GUI.skin.label);
-                styleTransform.fontSize = 22;
+                styleTransform.fontSize = 18;
 
                 if (monoSpaceFont != null)
                 {
@@ -283,7 +283,16 @@ namespace DebugStuff
                         return part.gameObject;
                         
                     case Mode.OBJECT:
-                        return hit.collider.gameObject;
+
+                        GameObject obj = hit.collider.gameObject;
+                        //print(obj.name);
+
+                        while (obj.transform.parent)
+                        {
+                            obj = obj.transform.parent.gameObject;
+                            //print(obj.name);
+                        }
+                        return obj;
                 }
 
             }
@@ -407,13 +416,21 @@ namespace DebugStuff
 
             addText(panelPos.gameObject, "Move the cursor over a part while holding shift to select a part");
 
-            addButton(panelPos.gameObject, "Dump to log", () => { print(sb.ToString()); });
+            var buttonPanel = addEmptyPanel(panelPos.gameObject);
 
-            activeMode = addText(panelPos.gameObject, "");
+            var bpl = buttonPanel.gameObject.AddComponent<HorizontalLayoutGroup>();
+            bpl.childAlignment = TextAnchor.UpperCenter;
+            bpl.childForceExpandHeight = true;
+            bpl.childForceExpandWidth = true;
+            bpl.padding = new RectOffset(5, 5, 5, 5);
 
-            activeMode.text = mode.ToString();
+            var bpsf = buttonPanel.gameObject.AddComponent<ContentSizeFitter>();
+            bpsf.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+            bpsf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-            addButton(panelPos.gameObject, "Mode", () =>
+            addButton(buttonPanel.gameObject, "Dump to log", () => { print(sb.ToString()); }, out activeMode);
+
+            addButton(buttonPanel.gameObject, mode.ToString(), () =>
             {
                 switch (mode)
                 {
@@ -428,17 +445,17 @@ namespace DebugStuff
                         break;
                 }
                 activeMode.text = mode.ToString();
-            });
+            }, out activeMode);
 
             partTree = addText(panelPos.gameObject, "");
             partTree.font = monoSpaceFont;
-            partTree.fontSize = 10;
+            partTree.fontSize = 9;
 
 
             return panelPos;
         }
 
-        private Button addButton(GameObject parent, string text, UnityAction click)
+        private Button addButton(GameObject parent, string text, UnityAction click, out Text textObj)
         {
             GameObject buttonObject = new GameObject("Button");
 
@@ -457,7 +474,7 @@ namespace DebugStuff
             button.interactable = true;
             button.onClick.AddListener(click);
 
-            addText(buttonObject, text);
+            textObj = addText(buttonObject, text);
 
             var csf = buttonObject.AddComponent<ContentSizeFitter>();
             csf.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
