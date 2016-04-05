@@ -162,6 +162,8 @@ namespace DebugStuff
                 }
             }
 
+            DrawTools.NewFrame();
+
             if (showUI && currentHoverPart)
                 DrawColliders(currentHoverPart.gameObject);
         }

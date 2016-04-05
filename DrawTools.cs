@@ -4,6 +4,8 @@ public static class DrawTools
 {
     private static Material _material;
 
+    private static int glDepth = 0;
+
     private static Material material
     {
         get
@@ -12,6 +14,37 @@ public static class DrawTools
             return _material;
         }
     }
+
+    // Ok that's cheap but I did not want to add a bunch 
+    // of try catch to make sure the GL calls ends.
+    public static void NewFrame()
+    {
+        glDepth = 0;
+    }
+
+    private static void GLStart()
+    {
+        if (glDepth == 0)
+        {
+            GL.PushMatrix();
+            material.SetPass(0);
+            GL.LoadPixelMatrix();
+            GL.Begin(GL.LINES);
+        }
+        glDepth++;
+    }
+
+    private static void GLEnd()
+    {
+        glDepth--;
+
+        if (glDepth == 0)
+        {
+            GL.End();
+            GL.PopMatrix();
+        }
+    }
+
 
     private static Camera GetActiveCam()
     {
@@ -60,46 +93,34 @@ public static class DrawTools
 
     public static void DrawTransform(Transform t, float scale = 1.0f)
     {
-        GL.PushMatrix();
-        material.SetPass(0);
-        GL.LoadPixelMatrix();
-        GL.Begin(GL.LINES);
+        GLStart();
 
         DrawRay(t.position, t.up * scale, Color.green);
         DrawRay(t.position, t.right * scale, Color.red);
         DrawRay(t.position, t.forward * scale, Color.blue);
 
-        GL.End();
-        GL.PopMatrix();
+        GLEnd();
     }
     public static void DrawPoint(Vector3 position, Color color, float scale = 1.0f)
     {
-        GL.PushMatrix();
-        material.SetPass(0);
-        GL.LoadPixelMatrix();
-        GL.Begin(GL.LINES);
+        GLStart();
         GL.Color(color);
 
         DrawRay(position + Vector3.up * (scale * 0.5f), -Vector3.up * scale, color);
         DrawRay(position + Vector3.right * (scale * 0.5f), -Vector3.right * scale, color);
         DrawRay(position + Vector3.forward * (scale * 0.5f), -Vector3.forward * scale, color);
 
-        GL.End();
-        GL.PopMatrix();
+        GLEnd();
     }
 
     public static void DrawArrow(Vector3 position, Vector3 direction, Color color)
     {
-        GL.PushMatrix();
-        material.SetPass(0);
-        GL.LoadPixelMatrix();
-        GL.Begin(GL.LINES);
+        GLStart();
         GL.Color(color);
 
         DrawRay(position, direction, color);
 
-        GL.End();
-        GL.PopMatrix();
+        GLEnd();
 
         DrawCone(position + direction, -direction * 0.333f, color, 15);
     }
@@ -114,10 +135,7 @@ public static class DrawTools
 
         float radius = length * Mathf.Tan(Mathf.Deg2Rad * angle);
 
-        GL.PushMatrix();
-        material.SetPass(0);
-        GL.LoadPixelMatrix();
-        GL.Begin(GL.LINES);
+        GLStart();
         GL.Color(color);
 
         DrawRay(position, direction + radius * up, color);
@@ -125,8 +143,7 @@ public static class DrawTools
         DrawRay(position, direction + radius * right, color);
         DrawRay(position, direction - radius * right, color);
 
-        GL.End();
-        GL.PopMatrix();
+        GLEnd();
 
         DrawCircle(position + forward, direction, color, radius);
         DrawCircle(position + forward * 0.5f, direction, color, radius * 0.5f);
@@ -134,14 +151,12 @@ public static class DrawTools
 
     public static void DrawLocalMesh(Transform transform, Mesh mesh, Color color)
     {
-        GL.PushMatrix();
-        material.SetPass(0);
-        GL.LoadPixelMatrix();
-        GL.Begin(GL.LINES);
-        GL.Color(color);
-
+        if (mesh == null || mesh.triangles == null || mesh.vertices == null)
+            return;
         int[] triangles = mesh.triangles;
         Vector3[] vertices = mesh.vertices;
+        GLStart();
+        GL.Color(color);
 
         for (int i = 0; i < triangles.Length; i += 3)
         {
@@ -153,8 +168,7 @@ public static class DrawTools
             DrawLine(p3, p1, color);
         }
 
-        GL.End();
-        GL.PopMatrix();
+        GLEnd();
     }
     public static void DrawBounds(Bounds bounds, Color color)
     {
@@ -174,10 +188,7 @@ public static class DrawTools
         Vector3 botc = center + new Vector3(-x, -y, z);
         Vector3 botd = center + new Vector3(-x, -y, -z);
 
-        GL.PushMatrix();
-        material.SetPass(0);
-        GL.LoadPixelMatrix();
-        GL.Begin(GL.LINES);
+        GLStart();
         GL.Color(color);
 
         // Top
@@ -198,8 +209,7 @@ public static class DrawTools
         DrawLine(botc, botd, color);
         DrawLine(botd, botb, color);
 
-        GL.End();
-        GL.PopMatrix();
+        GLEnd();
     }
 
     public static void DrawLocalCube(Transform transform, Vector3 size, Color color, Vector3 center = default(Vector3))
@@ -216,10 +226,7 @@ public static class DrawTools
         Vector3 botc = transform.TransformPoint(center + new Vector3(size.x, -size.y, size.z) * 0.5f);
         Vector3 botd = transform.TransformPoint(center + new Vector3(-size.x, -size.y, size.z) * 0.5f);
 
-        GL.PushMatrix();
-        material.SetPass(0);
-        GL.LoadPixelMatrix();
-        GL.Begin(GL.LINES);
+        GLStart();
         GL.Color(color);
 
         //top
@@ -240,8 +247,7 @@ public static class DrawTools
         DrawLine(botc, botd, color);
         DrawLine(botd, bota, color);
 
-        GL.End();
-        GL.PopMatrix();
+        GLEnd();
     }
 
     public static void DrawCapsule(Vector3 start, Vector3 end, Color color, float radius = 1)
@@ -264,10 +270,7 @@ public static class DrawTools
         DrawCircle(start, up, color, radius);
         DrawCircle(end, -up, color, radius);
 
-        GL.PushMatrix();
-        material.SetPass(0);
-        GL.LoadPixelMatrix();
-        GL.Begin(GL.LINES);
+        GLStart();
         GL.Color(color);
 
         //Side lines
@@ -294,8 +297,7 @@ public static class DrawTools
             DrawLine(Vector3.Slerp(-forward, up, stepFwd) + end, Vector3.Slerp(-forward, up, stepBck) + end, color);
         }
 
-        GL.End();
-        GL.PopMatrix();
+        GLEnd();
     }
 
     public static void DrawCircle(Vector3 position, Vector3 up, Color color, float radius = 1.0f)
@@ -323,10 +325,7 @@ public static class DrawTools
 
         Vector3 lastPoint = position + matrix.MultiplyPoint3x4(Vector3.right);
 
-        GL.PushMatrix();
-        material.SetPass(0);
-        GL.LoadPixelMatrix();
-        GL.Begin(GL.LINES);
+        GLStart();
         GL.Color(color);
 
         for (int i = 0; i <= segments; i++)
@@ -342,8 +341,7 @@ public static class DrawTools
             DrawLine(lastPoint, nextPoint, color);
             lastPoint = nextPoint;
         }
-        GL.End();
-        GL.PopMatrix();
+        GLEnd();
     }
 
     public static void DrawSphere(Vector3 position, Color color, float radius = 1.0f)
@@ -355,10 +353,7 @@ public static class DrawTools
         Vector3 y = new Vector3(position.x + radius, position.y, position.z);
         Vector3 z = new Vector3(position.x + radius, position.y, position.z);
 
-        GL.PushMatrix();
-        material.SetPass(0);
-        GL.LoadPixelMatrix();
-        GL.Begin(GL.LINES);
+        GLStart();
         GL.Color(color);
 
         for (int i = 1; i <= segments; i++)
@@ -376,8 +371,7 @@ public static class DrawTools
             y = nextY;
             z = nextZ;
         }
-        GL.End();
-        GL.PopMatrix();
+        GLEnd();
     }
 
     public static void DrawCylinder(Vector3 start, Vector3 end, Color color, float radius = 1)
@@ -391,10 +385,7 @@ public static class DrawTools
         DrawCircle(end, -up, color, radius);
         DrawCircle((start + end) * 0.5f, up, color, radius);
 
-        GL.PushMatrix();
-        material.SetPass(0);
-        GL.LoadPixelMatrix();
-        GL.Begin(GL.LINES);
+        GLStart();
         GL.Color(color);
 
         //Sides
@@ -411,7 +402,6 @@ public static class DrawTools
         //Bottom
         DrawLine(end - right, end + right, color);
         DrawLine(end - forward, end + forward, color);
-        GL.End();
-        GL.PopMatrix();
+        GLEnd();
     }
 }
