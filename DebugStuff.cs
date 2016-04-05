@@ -21,6 +21,7 @@ namespace DebugStuff
         private StringBuilder sb = new StringBuilder();
         private bool showUI;
         private Mode mode;
+        private DrawMode drawMode;
 
         private GUIStyle styleTransform;
         //private GUIStyle styleWindow;
@@ -30,6 +31,7 @@ namespace DebugStuff
         private static Vector2 originalLocalPointerPosition;
         private static Vector3 originalPanelLocalPosition;
         private static Text activeMode;
+        private static Text activeDrawMode;
         private static Text partTree;
         private static Font monoSpaceFont;
 
@@ -40,6 +42,12 @@ namespace DebugStuff
             PART,
             UI,
             OBJECT
+        }
+
+        private enum DrawMode
+        {
+            COLLIDER,
+            MESH
         }
 
         public void Awake()
@@ -154,7 +162,7 @@ namespace DebugStuff
             if (styleTransform == null)
             {
                 styleTransform = new GUIStyle(GUI.skin.label);
-                styleTransform.fontSize = 18;
+                styleTransform.fontSize = 16;
 
                 if (monoSpaceFont != null)
                 {
@@ -346,38 +354,51 @@ namespace DebugStuff
 
             flip++;
 
-            Collider[] comp = go.GetComponents<Collider>();
-            for (int i = 0; i < comp.Length; i++)
+            if (drawMode == DrawMode.COLLIDER)
             {
-                Collider baseCol = comp[i];
-
-                if (baseCol is BoxCollider)
+                Collider[] comp = go.GetComponents<Collider>();
+                for (int i = 0; i < comp.Length; i++)
                 {
-                    BoxCollider box = baseCol as BoxCollider;
-                    DrawTools.DrawLocalCube(box.transform, box.size, Color.yellow, box.center);
-                }
+                    Collider baseCol = comp[i];
 
-                if (baseCol is SphereCollider)
-                {
-                    SphereCollider sphere = baseCol as SphereCollider;
-                    DrawTools.DrawSphere(sphere.center, Color.red, sphere.radius);
-                }
+                    if (baseCol is BoxCollider)
+                    {
+                        BoxCollider box = baseCol as BoxCollider;
+                        DrawTools.DrawLocalCube(box.transform, box.size, Color.yellow, box.center);
+                    }
 
-                if (baseCol is CapsuleCollider)
-                {
-                    CapsuleCollider caps = baseCol as CapsuleCollider;
-                    Vector3 dir = new Vector3(caps.direction == 0 ? 1 : 0, caps.direction == 1 ? 1 : 0, caps.direction == 2 ? 1 : 0);
-                    Vector3 top = caps.transform.TransformPoint(caps.center + caps.height * 0.5f * dir);
-                    Vector3 bottom = caps.transform.TransformPoint(caps.center - caps.height * 0.5f * dir);
-                    DrawTools.DrawCapsule(top, bottom, Color.green, caps.radius);
-                }
+                    if (baseCol is SphereCollider)
+                    {
+                        SphereCollider sphere = baseCol as SphereCollider;
+                        DrawTools.DrawSphere(sphere.center, Color.red, sphere.radius);
+                    }
 
-                if (baseCol is MeshCollider)
-                {
-                    MeshCollider mesh = baseCol as MeshCollider;
-                    DrawTools.DrawLocalMesh(mesh.transform, mesh.sharedMesh, XKCDColors.ElectricBlue);
+                    if (baseCol is CapsuleCollider)
+                    {
+                        CapsuleCollider caps = baseCol as CapsuleCollider;
+                        Vector3 dir = new Vector3(caps.direction == 0 ? 1 : 0, caps.direction == 1 ? 1 : 0, caps.direction == 2 ? 1 : 0);
+                        Vector3 top = caps.transform.TransformPoint(caps.center + caps.height * 0.5f * dir);
+                        Vector3 bottom = caps.transform.TransformPoint(caps.center - caps.height * 0.5f * dir);
+                        DrawTools.DrawCapsule(top, bottom, Color.green, caps.radius);
+                    }
+
+                    if (baseCol is MeshCollider)
+                    {
+                        MeshCollider mesh = baseCol as MeshCollider;
+                        DrawTools.DrawLocalMesh(mesh.transform, mesh.sharedMesh, XKCDColors.ElectricBlue);
+                    }
                 }
             }
+            else
+            {
+                MeshFilter[] mesh = go.GetComponents<MeshFilter>();
+
+                for (int i = 0; i < mesh.Length; i++)
+                {
+                    DrawTools.DrawLocalMesh(mesh[i].transform, mesh[i].sharedMesh, XKCDColors.Orange);
+                }
+            }
+
             int count = go.transform.childCount;
             for (int i = 0; i < count; i++)
             {
@@ -434,6 +455,8 @@ namespace DebugStuff
 
             addButton(buttonPanel.gameObject, mode.ToString(), () =>
             {
+                currentHoverPart = previousHoverPart = null;
+                partTree.text = "";
                 switch (mode)
                 {
                     case Mode.PART:
@@ -449,11 +472,24 @@ namespace DebugStuff
                 activeMode.text = mode.ToString();
             }, out activeMode);
 
+            addButton(buttonPanel.gameObject, drawMode.ToString(), () =>
+            {
+                switch (drawMode)
+                {
+                    case DrawMode.COLLIDER:
+                        drawMode = DrawMode.MESH;
+                        break;
+                    case DrawMode.MESH:
+                        drawMode = DrawMode.COLLIDER;
+                        break;
+                }
+                activeDrawMode.text = drawMode.ToString();
+            }, out activeDrawMode);
+
             partTree = addText(panelPos.gameObject, "");
             partTree.font = monoSpaceFont;
-            partTree.fontSize = 9;
-
-
+            partTree.fontSize = 10;
+            
             return panelPos;
         }
 
