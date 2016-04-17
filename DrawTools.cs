@@ -19,6 +19,8 @@ public static class DrawTools
     // of try catch to make sure the GL calls ends.
     public static void NewFrame()
     {
+        if (glDepth > 0)
+            MonoBehaviour.print(glDepth);
         glDepth = 0;
     }
 
@@ -55,7 +57,7 @@ public static class DrawTools
         else if (HighLogic.LoadedSceneIsFlight)
             cam = FlightCamera.fetch.mainCamera;
         else
-            cam = Camera.current;
+            cam = Camera.main;
         return cam;
     }
 
