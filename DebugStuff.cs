@@ -2,8 +2,8 @@
 using System.Collections.Generic;
 using System.Text;
 using KSP.UI;
+using KSP.UI.Dialogs;
 using UnityEngine;
-using UnityEngine.Audio;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -33,9 +33,13 @@ namespace DebugStuff
         private static Text activeMode;
         private static Text activeDrawMode;
         private static Text partTree;
+        private static Text info;
+        private static Text limitText;
         private static Font monoSpaceFont;
-
         
+
+        private int limitDepth = 2;
+
 
         private enum Mode
         {
@@ -57,12 +61,12 @@ namespace DebugStuff
 
         public void Update()
         {
-            if (!HighLogic.LoadedSceneIsEditor && !HighLogic.LoadedSceneIsFlight)
-            {
-                if (window != null)
-                    window.gameObject.SetActive(false);
-                return;
-            }
+            //if (!HighLogic.LoadedSceneIsEditor && !HighLogic.LoadedSceneIsFlight)
+            //{
+            //    if (window != null)
+            //        window.gameObject.SetActive(false);
+            //    return;
+            //}
 
             if (GameSettings.MODIFIER_KEY.GetKey() && Input.GetKeyDown(KeyCode.P))
             {
@@ -97,7 +101,7 @@ namespace DebugStuff
                     scaler.referencePixelsPerUnit = 100;
 
                     GraphicRaycaster rayCaster = canvasObj.AddComponent<GraphicRaycaster>();
-                    
+
                     window = UICreateWindow(canvasObj);
                     //print("Created the UI");
                 }
@@ -119,7 +123,7 @@ namespace DebugStuff
                     // A canvas can not have more than 65000 vertex
                     // and a char is 4 vertex
                     int limit = 16000;
-                    // not exactly amsome but it works
+                    // not exactly awesome but it works
 
                     string tree = sb.ToString();
 
@@ -133,6 +137,55 @@ namespace DebugStuff
                     }
                 }
             }
+
+            if (showUI && currentHoverPart )
+            {
+                info.text = "something";
+            }
+        }
+
+        private string GetWheelBaseStatus(Part part)
+        {
+            var wb = part.GetComponentInChildren<ModuleWheelBase>();
+            string status = "";
+            if (wb == null)
+            {
+                return "No ModuleWheelBase";
+            }
+
+            if (wb.Wheel == null)
+            {
+                return "No Wheel?";
+            }
+
+            var ws = wb.Wheel.wheelState;
+            if (ws == null)
+                return "No WheelState";
+            
+            if (ws.hit.collider == null)
+                return "No Collider";
+
+            var col = ws.hit.collider;
+
+            status = col.GetType() + " " + col.name + " ";
+
+            Rigidbody rigidbody = col.attachedRigidbody;
+            if (rigidbody == null)
+            {
+                return status + "No Rigidbody";
+            }
+
+            Part collidedPart = rigidbody.GetComponent<Part>();
+            if (collidedPart == null)
+            {
+                return status + "No Part";
+            }
+            
+            if (collidedPart.vessel == part.vessel)
+            {
+                return status + "Same vessel";
+            }
+            return status + "Diff vessel";
         }
 
         public void InitFont()
@@ -275,10 +328,17 @@ namespace DebugStuff
                 }
                 return obj;
             }
-            else
+
+            if (mode == Mode.PART)
+            {
+                return Mouse.HoveredPart ? Mouse.HoveredPart.gameObject : null;
+            }
+
+
+            if (mode == Mode.OBJECT)
             {
                 Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-                int layerMask = mode == Mode.PART ? LayerMask.NameToLayer("Default") | LayerMask.NameToLayer("Ignore Raycast") | LayerMask.NameToLayer("Part Triggers") : ~LayerMask.NameToLayer("UI");
+                int layerMask = ~LayerMask.NameToLayer("UI");
 
                 if (!Physics.Raycast(ray, out hit, 500f, layerMask))
                 {
@@ -286,29 +346,19 @@ namespace DebugStuff
                     return null;
                 }
 
-                switch (mode)
+                GameObject obj = hit.collider.gameObject;
+                //print(obj.name);
+                int d = 0;
+                while (obj.transform.parent && d < limitDepth)
                 {
-                    case Mode.PART:
-                        Part part = hit.collider.gameObject.GetComponentUpwards<Part>();
-                        return part.gameObject;
-                        
-                    case Mode.OBJECT:
-
-                        GameObject obj = hit.collider.gameObject;
-                        //print(obj.name);
-
-                        while (obj.transform.parent)
-                        {
-                            obj = obj.transform.parent.gameObject;
-                            //print(obj.name);
-                        }
-                        return obj;
+                    obj = obj.transform.parent.gameObject;
+                    d++;
+                    //print(obj.name);
                 }
-
+                return obj;
             }
 
             return null;
-
         }
 
         private void DrawColliders(GameObject go)
@@ -349,7 +399,7 @@ namespace DebugStuff
                     break;
             }
 
-            if (mode != Mode.UI)
+            if (mode == Mode.PART)
                 GUI.Label(new Rect(point.x, Screen.currentResolution.height - point.y, size.x, size.y), go.transform.name, styleTransform);
 
             flip++;
@@ -370,7 +420,7 @@ namespace DebugStuff
                     if (baseCol is SphereCollider)
                     {
                         SphereCollider sphere = baseCol as SphereCollider;
-                        DrawTools.DrawSphere(sphere.center, Color.red, sphere.radius);
+                        DrawTools.DrawSphere(sphere.transform.TransformPoint(sphere.center), Color.red, sphere.radius);
                     }
 
                     if (baseCol is CapsuleCollider)
@@ -453,6 +503,24 @@ namespace DebugStuff
 
             addButton(buttonPanel.gameObject, "Dump to log", () => { print(sb.ToString()); }, out activeMode);
 
+            addButton(buttonPanel.gameObject, "List", () =>
+            {
+                var stuff = Resources.LoadAll("");
+                foreach (var o in stuff)
+                {
+                    GameObject obj = o as GameObject;
+                    if (obj)
+                    {
+                        print("GameObject - " + obj.name);
+                    }
+                    else
+                    {
+                        print("Type - " + o.GetType());
+                    }
+
+                }
+            }, out activeMode);
+
             addButton(buttonPanel.gameObject, mode.ToString(), () =>
             {
                 currentHoverPart = previousHoverPart = null;
@@ -472,6 +540,20 @@ namespace DebugStuff
                 activeMode.text = mode.ToString();
             }, out activeMode);
 
+            addButton(buttonPanel.gameObject, "-", () =>
+            {
+                limitDepth--;
+                limitText.text = limitDepth.ToString();
+            }, out activeDrawMode);
+
+            limitText = addText(buttonPanel.gameObject, limitDepth.ToString());
+
+            addButton(buttonPanel.gameObject, "+", () =>
+            {
+                limitDepth++;
+                limitText.text = limitDepth.ToString();
+            }, out activeDrawMode);
+
             addButton(buttonPanel.gameObject, drawMode.ToString(), () =>
             {
                 switch (drawMode)
@@ -486,10 +568,31 @@ namespace DebugStuff
                 activeDrawMode.text = drawMode.ToString();
             }, out activeDrawMode);
 
+            //addButton(buttonPanel.gameObject, "Stuff", () =>
+            //{
+            //    if (currentHoverPart)
+            //    {
+            //        var col = currentHoverPart.GetChild("casingCollider");
+            //        if (col != null)
+            //        {
+            //            var c = col.GetComponent<CapsuleCollider>();
+            //            c.enabled = !c.enabled;
+            //            print("casingCollider is now " + c.enabled);
+            //        }
+            //    }
+            //
+            //
+            //}, out xxx);
+
+
+            info = addText(panelPos.gameObject, "");
+            info.font = monoSpaceFont;
+            info.fontSize = 12;
+
             partTree = addText(panelPos.gameObject, "");
             partTree.font = monoSpaceFont;
-            partTree.fontSize = 10;
-            
+            partTree.fontSize = 11;
+
             return panelPos;
         }
 
@@ -559,7 +662,7 @@ namespace DebugStuff
         {
             //print("OnInitializePotentialDrag");
             originalPanelLocalPosition = window.localPosition;
-            RectTransformUtility.ScreenPointToLocalPointInRectangle((RectTransform) window.parent.transform, e.position, e.pressEventCamera, out originalLocalPointerPosition);
+            RectTransformUtility.ScreenPointToLocalPointInRectangle((RectTransform)window.parent.transform, e.position, e.pressEventCamera, out originalLocalPointerPosition);
         }
 
         private void OnBeginDrag(PointerEventData e)
@@ -570,7 +673,7 @@ namespace DebugStuff
         private void OnDrag(PointerEventData e)
         {
             Vector2 localPointerPosition;
-            if (RectTransformUtility.ScreenPointToLocalPointInRectangle((RectTransform) window.parent.transform, e.position, e.pressEventCamera, out localPointerPosition))
+            if (RectTransformUtility.ScreenPointToLocalPointInRectangle((RectTransform)window.parent.transform, e.position, e.pressEventCamera, out localPointerPosition))
             {
                 Vector3 offsetToOriginal = localPointerPosition - originalLocalPointerPosition;
                 window.localPosition = originalPanelLocalPosition + offsetToOriginal;
