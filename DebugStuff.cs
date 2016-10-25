@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using KSP.UI;
 using KSP.UI.Dialogs;
+using KSP.UI.Screens.DebugToolbar;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
@@ -186,7 +187,7 @@ namespace DebugStuff
 
             DrawTools.NewFrame();
 
-            if (showUI && currentDisplayedObject)
+            if (showUI && currentDisplayedObject && mode != Mode.UI)
                 DrawLabels(currentDisplayedObject);
         }
 
@@ -233,6 +234,11 @@ namespace DebugStuff
                 if (comp[i] is Transform)
                 {
                     sb.AppendFormat("{0}  {1} - {2}\n", preComp, comp[i].GetType().Name, go.transform.name);
+                }
+                else if (comp[i] is Text)
+                {
+                    Text t = (Text) comp[i];
+                    sb.AppendFormat("{0}  {1} - {2} - {3} - {4} - {5} - {6}\n", preComp, comp[i].GetType().Name, t.text, t.alignByGeometry, t.pixelsPerUnit, t.font.dynamic, t.fontSize);
                 }
                 else
                 {
@@ -443,7 +449,7 @@ namespace DebugStuff
                 Profiler.EndSample();
             }
 
-            if (bounds)
+            if (bounds && mode != Mode.UI)
             {
                 Profiler.BeginSample("bounds");
 
@@ -460,6 +466,19 @@ namespace DebugStuff
                 for (int i = 0; i < mesh.Length; i++)
                 {
                     DrawTools.DrawLocalCube(mesh[i].transform, mesh[i].mesh.bounds.size, XKCDColors.Pink, mesh[i].mesh.bounds.center);
+                }
+                Profiler.EndSample();
+            }
+
+            if (bounds && mode == Mode.UI)
+            {
+                Profiler.BeginSample("bounds");
+
+                RectTransform[] rt = go.GetComponents<RectTransform>();
+                for (int i = 0; i < rt.Length; i++)
+                {
+                    // TODO : search for the actual Canvas ?
+                    DrawTools.DrawRectTransform(rt[i], UIMasterController.Instance.appCanvas, XKCDColors.GreenApple);
                 }
                 Profiler.EndSample();
             }
@@ -562,7 +581,7 @@ namespace DebugStuff
 
             addButton(buttonPanel.gameObject, "-", (b) =>
             {
-                limitDepth--;
+                limitDepth = Math.Max(0, limitDepth - 1);
                 limitText.text = limitDepth.ToString();
                 currentDisplayedObject = GetRootObject(hoverObject);
             });
@@ -577,7 +596,28 @@ namespace DebugStuff
                 limitText.text = limitDepth.ToString();
                 currentDisplayedObject = GetRootObject(hoverObject);
             });
-            
+
+
+            addButton(buttonPanel.gameObject, "*", (b) =>
+            {
+                var debug = GameObject.FindObjectOfType<DebugScreen>();
+                print("Found DebugScreen");
+                CanvasScaler canvascaler = debug.GetComponentInParent<CanvasScaler>();
+                print("Found CanvasScaler");
+                Canvas canva = debug.GetComponentInParent<Canvas>();
+                print("Found Canvas");
+
+
+                print(canva.referencePixelsPerUnit + " " + canva.pixelPerfect + " " + canva.name);
+                print(canvascaler.referencePixelsPerUnit + " " + canvascaler.dynamicPixelsPerUnit);
+
+
+                canvascaler.dynamicPixelsPerUnit = canvascaler.referencePixelsPerUnit;
+
+            });
+
+
+
             var switchPanel = addEmptyPanel(panelPos.gameObject);
 
             var sl = switchPanel.gameObject.AddComponent<HorizontalLayoutGroup>();

@@ -172,6 +172,7 @@ public static class DrawTools
 
         GLEnd();
     }
+
     public static void DrawBounds(Bounds bounds, Color color)
     {
         Vector3 center = bounds.center;
@@ -213,6 +214,44 @@ public static class DrawTools
 
         GLEnd();
     }
+
+    public static void DrawRectTransform(RectTransform rectTransform, Canvas canvas, Color color)
+    {
+
+        Vector3[] corners = new Vector3[4];
+        Vector3[] screenCorners = new Vector3[2];
+
+        rectTransform.GetWorldCorners(corners);
+
+        if (canvas.renderMode == RenderMode.ScreenSpaceCamera || canvas.renderMode == RenderMode.WorldSpace)
+        {
+            screenCorners[0] = RectTransformUtility.WorldToScreenPoint(canvas.worldCamera, corners[1]);
+            screenCorners[1] = RectTransformUtility.WorldToScreenPoint(canvas.worldCamera, corners[3]);
+        }
+        else
+        {
+            screenCorners[0] = RectTransformUtility.WorldToScreenPoint(null, corners[1]);
+            screenCorners[1] = RectTransformUtility.WorldToScreenPoint(null, corners[3]);
+        }
+        
+        GLStart();
+        GL.Color(color);
+
+        GL.Vertex3(screenCorners[0].x, screenCorners[0].y, 0);
+        GL.Vertex3(screenCorners[0].x, screenCorners[1].y, 0);
+
+        GL.Vertex3(screenCorners[0].x, screenCorners[1].y, 0);
+        GL.Vertex3(screenCorners[1].x, screenCorners[1].y, 0);
+
+        GL.Vertex3(screenCorners[1].x, screenCorners[1].y, 0);
+        GL.Vertex3(screenCorners[1].x, screenCorners[0].y, 0);
+
+        GL.Vertex3(screenCorners[1].x, screenCorners[0].y, 0);
+        GL.Vertex3(screenCorners[0].x, screenCorners[0].y, 0);
+
+        GLEnd();
+    }
+
 
     public static void DrawLocalCube(Transform transform, Vector3 size, Color color, Vector3 center = default(Vector3))
     {
