@@ -51,11 +51,10 @@ public static class DrawTools
     private static Camera GetActiveCam()
     {
         Camera cam;
-
         if (HighLogic.LoadedSceneIsEditor)
             cam = EditorLogic.fetch.editorCamera;
         else if (HighLogic.LoadedSceneIsFlight)
-            cam = FlightCamera.fetch.mainCamera;
+            cam = MapView.MapIsEnabled ? PlanetariumCamera.Camera : FlightCamera.fetch.mainCamera;
         else
             cam = Camera.main;
         return cam;

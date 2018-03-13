@@ -7,6 +7,7 @@ using KSP.UI.Screens.DebugToolbar;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
+using UnityEngine.Profiling;
 using UnityEngine.UI;
 
 namespace DebugStuff
@@ -304,6 +305,9 @@ namespace DebugStuff
 
         private GameObject GetRootObject(GameObject leaf)
         {
+            if (leaf == null)
+                return null;
+
             if (mode == Mode.UI)
             {
                 int d = 0;
