@@ -152,18 +152,16 @@ namespace DebugStuff
 
         private static Camera GetActiveCam()
         {
-            Camera cam;
-
             if (!HighLogic.fetch)
                 return Camera.main;
 
-            if (HighLogic.LoadedSceneIsEditor)
-                cam = EditorLogic.fetch.editorCamera;
-            else if (HighLogic.LoadedSceneIsFlight)
-                cam = MapView.MapIsEnabled ? PlanetariumCamera.Camera : FlightCamera.fetch.mainCamera;
-            else
-                cam = Camera.main;
-            return cam;
+            if (HighLogic.LoadedSceneIsEditor && EditorLogic.fetch)
+                return EditorLogic.fetch.editorCamera;
+            
+            if (HighLogic.LoadedSceneIsFlight && PlanetariumCamera.fetch && FlightCamera.fetch)
+                return MapView.MapIsEnabled ? PlanetariumCamera.Camera : FlightCamera.fetch.mainCamera;
+            
+            return Camera.main;
         }
 
         private static void DrawLine(Vector3 origin, Vector3 destination, Color color)
