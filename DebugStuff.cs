@@ -241,6 +241,24 @@ namespace DebugStuff
                     Text t = (Text) comp[i];
                     sb.AppendFormat("{0}  {1} - {2} - {3} - {4} - {5} - {6}\n", preComp, comp[i].GetType().Name, t.text, t.alignByGeometry, t.pixelsPerUnit, t.font.dynamic, t.fontSize);
                 }
+                else if (comp[i] is Renderer)
+                {
+                    Renderer r = (Renderer) comp[i];
+                    if (r.materials.Length == 1)
+                    {
+                        Material m = r.material;
+                        sb.AppendFormat("{0}  {1} - {2} - {3}\n", preComp, comp[i].GetType().Name, m != null ? m.name : "(null)" , m != null && m.shader != null ? m.shader.name: "(null)");
+                    }
+                    else
+                    {
+                        sb.AppendFormat("{0}  {1}\n", preComp, comp[i].GetType().Name);
+                        for (int j = 0; j < r.materials.Length; j++)
+                        {
+                            Material m = r.materials[j];
+                            sb.AppendFormat("{0}     {1} - {2}\n", pre + front, m != null ? m.name : "(null)", m != null && m.shader != null ? m.shader.name: "(null)");
+                        }
+                    }
+                }
                 else
                 {
                     sb.AppendFormat("{0}  {1} - {2}\n", preComp, comp[i].GetType().Name, comp[i].name);
