@@ -223,7 +223,7 @@ namespace DebugStuff
             {
                 sb.Append("+");
             }
-            sb.AppendFormat("{0} T:{1} L:{2} ({3})\n", go.name, go.tag, go.layer, LayerMask.LayerToName(go.layer));
+            sb.AppendFormat("{0} A:{1}, T:{2} L:{3} ({4})\n", go.name, go.activeSelf, go.tag, go.layer, LayerMask.LayerToName(go.layer));
 
             string front = first ? "" : "  ";
             string preComp = pre + front + (count > 0 ? "| " : "  ");
