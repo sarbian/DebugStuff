@@ -2,8 +2,8 @@
 using System.Collections.Generic;
 using System.Text;
 using KSP.UI;
-using KSP.UI.Dialogs;
 using KSP.UI.Screens.DebugToolbar;
+using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
@@ -233,14 +233,40 @@ namespace DebugStuff
 
             for (int i = 0; i < comp.Length; i++)
             {
-                if (comp[i] is Transform)
+                if (comp[i] == null)
+                    continue;
+
+                if (comp[i] is RectTransform)
+                {
+                    RectTransform rect = (RectTransform)comp[i];
+                    sb.AppendFormat("{0}  {1} - {2}\n{0}  Anchor Min {3:F0} - Max {4:F0} - Pivot {5}\n{0}  Position {6:F0} - Rotation {8:F5} - Size {7:F0}\n"
+                        , preComp, comp[i].GetType().Name, go.transform.name, rect.anchorMin, rect.anchorMax, rect.pivot, rect.anchoredPosition3D, rect.sizeDelta, rect.localRotation.eulerAngles);
+                }
+                //else if (comp[i] is Canvas)
+                //{
+                //    Debug.Log("4-3");
+                //    Canvas c = (Canvas)comp[i];
+                //    sb.AppendFormat("{0}  {1} - {2}\n{0} Mode {3} - PP {4} - Camera {5} - Sort {6} - Layer {7} - LayerName {8}\n"
+                //        , preComp, comp[i].GetType().Name, go.transform.name, c.renderMode, c.pixelPerfect, c.worldCamera.name, c.sortingOrder, c.sortingLayerID, c.sortingLayerName);
+                //}
+                else if (comp[i] is CanvasScaler)
+                {
+                    CanvasScaler cs = (CanvasScaler)comp[i];
+                    sb.AppendFormat("{0}  {1} - {2}\n{0} Mode {3} - Scale {4:N1} - PPU {5:N1}\n", preComp, comp[i].GetType().Name, go.transform.name, cs.uiScaleMode, cs.scaleFactor, cs.referencePixelsPerUnit);
+                }
+                else if (comp[i] is Transform)
                 {
                     sb.AppendFormat("{0}  {1} - {2}\n", preComp, comp[i].GetType().Name, go.transform.name);
                 }
                 else if (comp[i] is Text)
                 {
-                    Text t = (Text) comp[i];
+                    Text t = (Text)comp[i];
                     sb.AppendFormat("{0}  {1} - {2} - {3} - {4} - {5} - {6}\n", preComp, comp[i].GetType().Name, t.text, t.alignByGeometry, t.pixelsPerUnit, t.font.dynamic, t.fontSize);
+                }
+                else if (comp[i] is TextMeshProUGUI)
+                {
+                    TextMeshProUGUI tmp = (TextMeshProUGUI)comp[i];
+                    sb.AppendFormat("{0}  {1} - {2}\n{0}  {3} - {4} - {5} - {6}\n", preComp, comp[i].GetType().Name, tmp.text, tmp.fontSize, tmp.fontStyle, tmp.alignment, tmp.color);
                 }
                 else if (comp[i] is Renderer)
                 {
