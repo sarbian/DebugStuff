@@ -467,6 +467,14 @@ namespace DebugStuff
                         DrawTools.DrawLocalMesh(mesh.transform, mesh.sharedMesh, XKCDColors.ElectricBlue);
                         Profiler.EndSample();
                     }
+
+                    if (baseCol is WheelCollider)
+                    {
+                        Profiler.BeginSample("WheelCollider");
+                        WheelCollider wheel = baseCol as WheelCollider;
+                        DrawTools.DrawCircle(wheel.transform.position, wheel.transform.right, XKCDColors.Fuchsia, wheel.radius);
+                        Profiler.EndSample();
+                    }
                 }
                 Profiler.EndSample();
             }
