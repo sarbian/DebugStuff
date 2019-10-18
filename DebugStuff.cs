@@ -23,6 +23,7 @@ namespace DebugStuff
         private StringBuilder sb = new StringBuilder();
         private bool showUI;
         private Mode mode;
+        private bool showActiveOnly = false;
 
         private bool meshes = false;
         private bool colliders = false;
@@ -223,7 +224,7 @@ namespace DebugStuff
             {
                 sb.Append("+");
             }
-            sb.AppendFormat("{0} T:{1} L:{2} ({3})\n", go.name, go.tag, go.layer, LayerMask.LayerToName(go.layer));
+            sb.AppendFormat("{0} A:{1}, T:{2} L:{3} ({4})\n", go.name, go.activeSelf, go.tag, go.layer, LayerMask.LayerToName(go.layer));
 
             string front = first ? "" : "  ";
             string preComp = pre + front + (count > 0 ? "| " : "  ");
@@ -524,8 +525,11 @@ namespace DebugStuff
             {
                 GameObject child = go.transform.GetChild(i).gameObject;
 
-                if (!child.GetComponent<Part>() && child.name != "main camera pivot")
-                    DrawObjects(child);
+                if (child.GetComponent<Part>()) continue;
+                if (child.name == "main camera pivot") continue;
+                if (showActiveOnly && !child.activeInHierarchy) continue;
+
+                DrawObjects(child);
             }
             Profiler.EndSample();
         }
@@ -638,6 +642,12 @@ namespace DebugStuff
 
             });
 
+            addButton(buttonPanel.gameObject, GetActiveOnlyString(showActiveOnly), (b) =>
+            {
+                showActiveOnly = !showActiveOnly;
+                b.text = GetActiveOnlyString(showActiveOnly);
+            });
+
 
 
             var switchPanel = addEmptyPanel(panelPos.gameObject);
@@ -698,6 +708,11 @@ namespace DebugStuff
         private string getSwitchString(bool state, string label)
         {
             return string.Format("[{0}] {1}", state ? "X" : " ", label);
+        }
+
+        private string GetActiveOnlyString(bool activeOnly)
+        {
+            return activeOnly ? "Active" : "All";
         }
 
         private Button addButton(GameObject parent, string text, UnityAction<Text> click)
