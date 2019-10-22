@@ -55,6 +55,14 @@ namespace DebugStuff
         public void Awake()
         {
             DontDestroyOnLoad(this);
+            
+            print("Listing available shaders");
+            UnityEngine.Shader[] shaders = Resources.FindObjectsOfTypeAll<Shader>();
+            print("Found " + shaders.Length + " shaders");
+            foreach (Shader shader in shaders)
+            {
+                print(shader.name);
+            }
         }
 
         public void Update()
