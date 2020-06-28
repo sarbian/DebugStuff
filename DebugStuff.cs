@@ -2,13 +2,14 @@
 using System.Collections.Generic;
 using System.Text;
 using KSP.UI;
+using KSP.UI.Dialogs;
 using KSP.UI.Screens.DebugToolbar;
-using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
 using UnityEngine.Profiling;
 using UnityEngine.UI;
+using TMPro;
 
 namespace DebugStuff
 {
@@ -23,13 +24,14 @@ namespace DebugStuff
         private StringBuilder sb = new StringBuilder();
         private bool showUI;
         private Mode mode;
-        private bool showActiveOnly = false;
 
         private bool meshes = false;
         private bool colliders = false;
         private bool transforms = true;
         private bool labels = true;
         private bool bounds = true;
+        private bool joints = false;
+        private bool activeOnly = false;
 
         private GUIStyle styleTransform;
         //private GUIStyle styleWindow;
@@ -55,14 +57,6 @@ namespace DebugStuff
         public void Awake()
         {
             DontDestroyOnLoad(this);
-            
-            print("Listing available shaders");
-            UnityEngine.Shader[] shaders = Resources.FindObjectsOfTypeAll<Shader>();
-            print("Found " + shaders.Length + " shaders");
-            foreach (Shader shader in shaders)
-            {
-                print(shader.name);
-            }
         }
 
         public void Update()
@@ -232,13 +226,14 @@ namespace DebugStuff
             {
                 sb.Append("+");
             }
-            sb.AppendFormat("{0} A:{1}, T:{2} L:{3} ({4})\n", go.name, go.activeSelf, go.tag, go.layer, LayerMask.LayerToName(go.layer));
+
+            sb.AppendFormat("{0} T:{1} L:{2} ({3})\n", go.name, go.tag, go.layer, LayerMask.LayerToName(go.layer));
 
             string front = first ? "" : "  ";
             string preComp = pre + front + (count > 0 ? "| " : "  ");
 
             Component[] comp = go.GetComponents<Component>();
-
+            
             for (int i = 0; i < comp.Length; i++)
             {
                 if (comp[i] == null)
@@ -247,8 +242,8 @@ namespace DebugStuff
                 if (comp[i] is RectTransform)
                 {
                     RectTransform rect = (RectTransform)comp[i];
-                    sb.AppendFormat("{0}  {1} - {2}\n{0}  Anchor Min {3:F0} - Max {4:F0} - Pivot {5}\n{0}  Position {6:F0} - Rotation {8:F5} - Size {7:F0}\n"
-                        , preComp, comp[i].GetType().Name, go.transform.name, rect.anchorMin, rect.anchorMax, rect.pivot, rect.anchoredPosition3D, rect.sizeDelta, rect.localRotation.eulerAngles);
+                    sb.AppendFormat("{0}  {1} - {2}\n    {0} - Anchor Min {3:F0} - Max {4:F0} - Pivot {5} - Scale: {9:F2}\n{0}    Position {6:F0} - Rotation {8:F5} - Size {7:F0}\n"
+                        , preComp, comp[i].GetType().Name, go.transform.name, rect.anchorMin, rect.anchorMax, rect.pivot, rect.anchoredPosition3D, rect.sizeDelta, rect.localRotation.eulerAngles, rect.localScale);
                 }
                 //else if (comp[i] is Canvas)
                 //{
@@ -260,39 +255,72 @@ namespace DebugStuff
                 else if (comp[i] is CanvasScaler)
                 {
                     CanvasScaler cs = (CanvasScaler)comp[i];
-                    sb.AppendFormat("{0}  {1} - {2}\n{0} Mode {3} - Scale {4:N1} - PPU {5:N1}\n", preComp, comp[i].GetType().Name, go.transform.name, cs.uiScaleMode, cs.scaleFactor, cs.referencePixelsPerUnit);
+                    sb.AppendFormat("{0}  {1} - {2}\n    {0} - Mode {3} - Scale {4:N1} - PPU {5:N1}\n", preComp, comp[i].GetType().Name, go.transform.name, cs.uiScaleMode, cs.scaleFactor, cs.referencePixelsPerUnit);
                 }
                 else if (comp[i] is Transform)
                 {
-                    sb.AppendFormat("{0}  {1} - {2}\n", preComp, comp[i].GetType().Name, go.transform.name);
+                    sb.AppendFormat("{0}  {1} - {2}\n{0} - Position ({3:N4}, {4:N4}, {5:N4}) - Rotation: {6} - Scale: {7}\n", preComp, comp[i].GetType().Name, go.transform.name, comp[i].transform.localPosition.x, comp[i].transform.localPosition.y, comp[i].transform.localPosition.z, comp[i].transform.localRotation.eulerAngles, comp[i].transform.localScale);
                 }
                 else if (comp[i] is Text)
                 {
-                    Text t = (Text)comp[i];
+                    Text t = (Text) comp[i];
                     sb.AppendFormat("{0}  {1} - {2} - {3} - {4} - {5} - {6}\n", preComp, comp[i].GetType().Name, t.text, t.alignByGeometry, t.pixelsPerUnit, t.font.dynamic, t.fontSize);
                 }
                 else if (comp[i] is TextMeshProUGUI)
                 {
                     TextMeshProUGUI tmp = (TextMeshProUGUI)comp[i];
-                    sb.AppendFormat("{0}  {1} - {2}\n{0}  {3} - {4} - {5} - {6}\n", preComp, comp[i].GetType().Name, tmp.text, tmp.fontSize, tmp.fontStyle, tmp.alignment, tmp.color);
+                    sb.AppendFormat("{0}  {1} - {2}\n    {0}  {3} - {4} - {5} - {6}\n", preComp, comp[i].GetType().Name, tmp.text, tmp.fontSize, tmp.fontStyle, tmp.alignment, tmp.color);
                 }
-                else if (comp[i] is Renderer)
+                else if (comp[i] is Light)
                 {
-                    Renderer r = (Renderer) comp[i];
-                    if (r.materials.Length == 1)
+                    Light l = (Light)comp[i];
+                    sb.AppendFormat("{16}  {17} - {18}\n{16}    Range: {0} - Spot Angle: {1} - CookieSize: {2} - CullingMask: {3}\n{16}    ShadowNearPlane: {4} - ShadowNormalBias: {5} - ShadowCustomResolution: {6} - ShadowBias: {7}\n{16}    Color: {8} - ColorTemp: {9} - Intensity: {10} - Type: {11}\n{16}    Shadows: {12} - ShadowStrength: {13} - ShadowResolution: {14} - BounceIntensity: {15}\n"
+                        , l.range, l.spotAngle, l.cookieSize, l.cullingMask, l.shadowNearPlane, l.shadowNormalBias, l.shadowCustomResolution
+                        , l.shadowBias, l.color, l.colorTemperature, l.intensity, l.type
+                        , l.shadows, l.shadowStrength, l.shadowResolution, l.bounceIntensity
+                        , preComp, comp[i].GetType().Name, go.transform.name);
+                }
+                else if (comp[i] is Image)
+                {
+                    Image im = (Image)comp[i];
+                    sb.AppendFormat("{1}  {2} - {3}\n{1}    Color: {0} - Fill: {4}\n", im.color.ToString(), preComp, comp[i].GetType().Name, go.transform.name, im.type.ToString());
+                }
+                else if (comp[i] is Button)
+                {
+                    Button bt = (Button)comp[i];
+                    sb.AppendFormat("{0}  {1} - {2}\n", preComp, comp[i].GetType().Name, go.transform.name);
+                    for (int j = 0; j < bt.onClick.GetPersistentEventCount(); j++)
                     {
-                        Material m = r.material;
-                        sb.AppendFormat("{0}  {1} - {2} - {3}\n", preComp, comp[i].GetType().Name, m != null ? m.name : "(null)" , m != null && m.shader != null ? m.shader.name: "(null)");
+
+                        sb.AppendFormat("{0}  Button Listener: {1}\n", preComp, bt.onClick.GetPersistentMethodName(j));
                     }
-                    else
-                    {
-                        sb.AppendFormat("{0}  {1}\n", preComp, comp[i].GetType().Name);
-                        for (int j = 0; j < r.materials.Length; j++)
-                        {
-                            Material m = r.materials[j];
-                            sb.AppendFormat("{0}     {1} - {2}\n", pre + front, m != null ? m.name : "(null)", m != null && m.shader != null ? m.shader.name: "(null)");
-                        }
-                    }
+                }
+                else if (comp[i] is MeshCollider)
+                {
+                    MeshCollider mc = (MeshCollider)comp[i];
+                    sb.AppendFormat("{1}  {2} - {3}\n{1}    Convex: {0}\n", mc.convex, preComp, comp[i].GetType().Name, go.transform.name);
+                }
+                else if (comp[i] is BoxCollider)
+                {
+                    BoxCollider bc = (BoxCollider)comp[i];
+                    sb.AppendFormat("{2}  {3} - {4}\n{2}    Center: {0} - Size: {1}\n", bc.center, bc.size, preComp, comp[i].GetType().Name, go.transform.name);
+                }
+                else if (comp[i] is SphereCollider)
+                {
+                    SphereCollider sc = (SphereCollider)comp[i];
+                    sb.AppendFormat("{2}  {3} - {4}\n{2}    Center: {0} - Radius: {1}\n", sc.center, sc.radius, preComp, comp[i].GetType().Name, go.transform.name);
+                }
+                else if (comp[i] is CapsuleCollider)
+                {
+                    CapsuleCollider cc = (CapsuleCollider)comp[i];
+                    sb.AppendFormat("{4}  {5} - {6}\n{4}    Center: {0} - Radius: {1} - Height: {2} - Direction: {3}\n", cc.center, cc.radius, cc.height, cc.direction
+                        , preComp, comp[i].GetType().Name, go.transform.name);
+                }
+                else if (comp[i] is Animation)
+                {
+                    Animation anim = (Animation)comp[i];
+                    sb.AppendFormat("{0}  {1} - {2}\n{0}    Playing Automatically: {3} - Wrap Mode: {4} - Clip Count: {5}\n{0}    Clips: {6}\n", preComp, comp[i].GetType().Name, go.transform.name
+                        , anim.playAutomatically, anim.wrapMode, anim.GetClipCount(), AnimationClips(anim));
                 }
                 else
                 {
@@ -306,6 +334,21 @@ namespace DebugStuff
             {
                 DumpGameObjectChilds(neededChilds[i], i == count - 1 ? pre + front + " " : pre + front + "|", sb);
             }
+        }
+
+        private string AnimationClips(Animation anim)
+        {
+            StringBuilder asb = StringBuilderCache.Acquire(256);
+
+            int i = 0;
+
+            foreach (AnimationState clip in anim)
+            {
+                asb.AppendFormat("{0} - {1} | ", i.ToString(), clip.name);
+                i++;
+            }
+
+            return asb.ToStringAndRelease();
         }
 
         private GameObject CheckForObjectUnderCursor()
@@ -364,7 +407,7 @@ namespace DebugStuff
             if (mode == Mode.UI)
             {
                 int d = 0;
-                while (leaf.transform.parent && !leaf.transform.parent.gameObject.GetComponent<Canvas>() && d < limitDepth)
+                while (leaf.transform.parent /*&& !leaf.transform.parent.gameObject.GetComponent<Canvas>()*/ && d < limitDepth)
                 {
                     leaf = leaf.transform.parent.gameObject;
                     d++;
@@ -393,60 +436,63 @@ namespace DebugStuff
 
         private void DrawLabels(GameObject go)
         {
-            Profiler.BeginSample("DrawLabels");
-
-            if (labels)
+            if (!activeOnly || go.activeInHierarchy)
             {
-                Profiler.BeginSample("labels");
-                Camera cam;
+                Profiler.BeginSample("DrawLabels");
 
-                if (HighLogic.LoadedSceneIsEditor)
-                    cam = EditorLogic.fetch.editorCamera;
-                else if (HighLogic.LoadedSceneIsFlight)
-                    cam = FlightCamera.fetch.mainCamera;
-                else
-                    cam = Camera.main;
-
-                Vector3 point = cam.WorldToScreenPoint(go.transform.position);
-                Vector2 size = styleTransform.CalcSize(new GUIContent(go.transform.name));
-
-                // Clearly there is a simpler way but I am half alseep
-                switch (flip % 4)
+                if (labels)
                 {
-                    case 0:
-                        point.x = point.x - size.x - 5;
-                        point.y = point.y - 2;
-                        break;
-                    case 1:
-                        point.x = point.x + 5;
-                        point.y = point.y - 2;
-                        break;
-                    case 2:
-                        point.x = point.x - size.x - 5;
-                        point.y = point.y + size.y + 2;
-                        break;
-                    case 3:
-                        point.x = point.x + 5;
-                        point.y = point.y + size.y + 2;
-                        break;
+                    Profiler.BeginSample("labels");
+                    Camera cam;
+
+                    if (HighLogic.LoadedSceneIsEditor)
+                        cam = EditorLogic.fetch.editorCamera;
+                    else if (HighLogic.LoadedSceneIsFlight)
+                        cam = FlightCamera.fetch.mainCamera;
+                    else
+                        cam = Camera.main;
+
+                    Vector3 point = cam.WorldToScreenPoint(go.transform.position);
+                    Vector2 size = styleTransform.CalcSize(new GUIContent(go.transform.name));
+
+                    // Clearly there is a simpler way but I am half alseep
+                    switch (flip % 4)
+                    {
+                        case 0:
+                            point.x = point.x - size.x - 5;
+                            point.y = point.y - 2;
+                            break;
+                        case 1:
+                            point.x = point.x + 5;
+                            point.y = point.y - 2;
+                            break;
+                        case 2:
+                            point.x = point.x - size.x - 5;
+                            point.y = point.y + size.y + 2;
+                            break;
+                        case 3:
+                            point.x = point.x + 5;
+                            point.y = point.y + size.y + 2;
+                            break;
+                    }
+
+
+                    GUI.Label(new Rect(point.x, Screen.currentResolution.height - point.y, size.x, size.y), go.transform.name, styleTransform);
+
+                    flip++;
+                    Profiler.EndSample();
                 }
 
+                int count = go.transform.childCount;
+                for (int i = 0; i < count; i++)
+                {
+                    GameObject child = go.transform.GetChild(i).gameObject;
 
-                GUI.Label(new Rect(point.x, Screen.currentResolution.height - point.y, size.x, size.y), go.transform.name, styleTransform);
-
-                flip++;
+                    if (!child.GetComponent<Part>() && child.name != "main camera pivot")
+                        DrawLabels(child);
+                }
                 Profiler.EndSample();
             }
-
-            int count = go.transform.childCount;
-            for (int i = 0; i < count; i++)
-            {
-                GameObject child = go.transform.GetChild(i).gameObject;
-
-                if (!child.GetComponent<Part>() && child.name != "main camera pivot")
-                    DrawLabels(child);
-            }
-            Profiler.EndSample();
         }
 
         private void DrawObjects(GameObject go)
@@ -455,84 +501,85 @@ namespace DebugStuff
 
             if (transforms)
             {
-                Profiler.BeginSample("transforms");
-                DrawTools.DrawTransform(go.transform, 0.3f);
-                Profiler.EndSample();
+                if (!activeOnly || go.activeInHierarchy)
+                {
+                    Profiler.BeginSample("transforms");
+                    DrawTools.DrawTransform(go.transform, 0.3f);
+                    Profiler.EndSample();
+                }
             }
 
             if (colliders)
             {
-                Profiler.BeginSample("colliders");
-                Collider[] comp = go.GetComponents<Collider>();
-                for (int i = 0; i < comp.Length; i++)
+                if (!activeOnly || go.activeInHierarchy)
                 {
-                    Collider baseCol = comp[i];
-
-                    if (baseCol is BoxCollider)
+                    Profiler.BeginSample("colliders");
+                    Collider[] comp = go.GetComponents<Collider>();
+                    for (int i = 0; i < comp.Length; i++)
                     {
-                        Profiler.BeginSample("BoxCollider");
-                        BoxCollider box = baseCol as BoxCollider;
-                        DrawTools.DrawLocalCube(box.transform, box.size, Color.yellow, box.center);
-                        Profiler.EndSample();
-                    }
+                        Collider baseCol = comp[i];
 
-                    if (baseCol is SphereCollider)
-                    {
-                        Profiler.BeginSample("SphereCollider");
-                        SphereCollider sphere = baseCol as SphereCollider;
-                        DrawTools.DrawSphere(sphere.transform.TransformPoint(sphere.center), Color.red, sphere.radius);
-                        Profiler.EndSample();
-                    }
+                        if (baseCol is BoxCollider)
+                        {
+                            Profiler.BeginSample("BoxCollider");
+                            BoxCollider box = baseCol as BoxCollider;
+                            DrawTools.DrawLocalCube(box.transform, box.size, Color.yellow, box.center);
+                            Profiler.EndSample();
+                        }
 
-                    if (baseCol is CapsuleCollider)
-                    {
-                        Profiler.BeginSample("CapsuleCollider");
-                        CapsuleCollider caps = baseCol as CapsuleCollider;
-                        Vector3 dir = new Vector3(caps.direction == 0 ? 1 : 0, caps.direction == 1 ? 1 : 0, caps.direction == 2 ? 1 : 0);
-                        Vector3 top = caps.transform.TransformPoint(caps.center + caps.height * 0.5f * dir);
-                        Vector3 bottom = caps.transform.TransformPoint(caps.center - caps.height * 0.5f * dir);
-                        DrawTools.DrawCapsule(top, bottom, Color.green, caps.radius);
-                        Profiler.EndSample();
-                    }
+                        if (baseCol is SphereCollider)
+                        {
+                            Profiler.BeginSample("SphereCollider");
+                            SphereCollider sphere = baseCol as SphereCollider;
+                            DrawTools.DrawSphere(sphere.transform.TransformPoint(sphere.center), Color.red, sphere.radius);
+                            Profiler.EndSample();
+                        }
 
-                    if (baseCol is MeshCollider)
-                    {
-                        Profiler.BeginSample("MeshCollider");
-                        MeshCollider mesh = baseCol as MeshCollider;
-                        DrawTools.DrawLocalMesh(mesh.transform, mesh.sharedMesh, XKCDColors.ElectricBlue);
-                        Profiler.EndSample();
-                    }
+                        if (baseCol is CapsuleCollider)
+                        {
+                            Profiler.BeginSample("CapsuleCollider");
+                            CapsuleCollider caps = baseCol as CapsuleCollider;
+                            Vector3 dir = new Vector3(caps.direction == 0 ? 1 : 0, caps.direction == 1 ? 1 : 0, caps.direction == 2 ? 1 : 0);
+                            Vector3 top = caps.transform.TransformPoint(caps.center + caps.height * 0.5f * dir);
+                            Vector3 bottom = caps.transform.TransformPoint(caps.center - caps.height * 0.5f * dir);
+                            DrawTools.DrawCapsule(top, bottom, Color.green, caps.radius);
+                            Profiler.EndSample();
+                        }
 
-                    if (baseCol is WheelCollider)
-                    {
-                        Profiler.BeginSample("WheelCollider");
-                        WheelCollider wheel = baseCol as WheelCollider;
-                        DrawTools.DrawCircle(wheel.transform.position, wheel.transform.right, XKCDColors.Fuchsia, wheel.radius);
-                        Profiler.EndSample();
+                        if (baseCol is MeshCollider)
+                        {
+                            Profiler.BeginSample("MeshCollider");
+                            MeshCollider mesh = baseCol as MeshCollider;
+                            DrawTools.DrawLocalMesh(mesh.transform, mesh.sharedMesh, XKCDColors.ElectricBlue);
+                            Profiler.EndSample();
+                        }
                     }
+                    Profiler.EndSample();
                 }
-                Profiler.EndSample();
             }
 
             if (bounds && mode != Mode.UI)
             {
-                Profiler.BeginSample("bounds");
-
-                //DrawTools.DrawBounds(go.GetRendererBounds(), XKCDColors.Pink);
-
-                //Renderer[] renderers = go.GetComponents<Renderer>();
-                //for (int i = 0; i < renderers.Length; i++)
-                //{
-                //    Bounds bound = renderers[i].bounds;
-                //    DrawTools.DrawLocalCube(renderers[i].transform, bound.size, XKCDColors.Pink, bound.center);
-                //}
-
-                MeshFilter[] mesh = go.GetComponents<MeshFilter>();
-                for (int i = 0; i < mesh.Length; i++)
+                if (!activeOnly || go.activeInHierarchy)
                 {
-                    DrawTools.DrawLocalCube(mesh[i].transform, mesh[i].mesh.bounds.size, XKCDColors.Pink, mesh[i].mesh.bounds.center);
+                    Profiler.BeginSample("bounds");
+
+                    //DrawTools.DrawBounds(go.GetRendererBounds(), XKCDColors.Pink);
+
+                    //Renderer[] renderers = go.GetComponents<Renderer>();
+                    //for (int i = 0; i < renderers.Length; i++)
+                    //{
+                    //    Bounds bound = renderers[i].bounds;
+                    //    DrawTools.DrawLocalCube(renderers[i].transform, bound.size, XKCDColors.Pink, bound.center);
+                    //}
+
+                    MeshFilter[] mesh = go.GetComponents<MeshFilter>();
+                    for (int i = 0; i < mesh.Length; i++)
+                    {
+                        DrawTools.DrawLocalCube(mesh[i].transform, mesh[i].mesh.bounds.size, XKCDColors.Pink, mesh[i].mesh.bounds.center);
+                    }
+                    Profiler.EndSample();
                 }
-                Profiler.EndSample();
             }
 
             if (bounds && mode == Mode.UI)
@@ -550,14 +597,32 @@ namespace DebugStuff
 
             if (meshes)
             {
-                Profiler.BeginSample("meshes");
-                MeshFilter[] mesh = go.GetComponents<MeshFilter>();
-
-                for (int i = 0; i < mesh.Length; i++)
+                if (!activeOnly || go.activeInHierarchy)
                 {
-                    Profiler.BeginSample("LocalMesh");
-                    DrawTools.DrawLocalMesh(mesh[i].transform, mesh[i].sharedMesh, XKCDColors.Orange);
+                    Profiler.BeginSample("meshes");
+                    MeshFilter[] mesh = go.GetComponents<MeshFilter>();
+
+                    for (int i = 0; i < mesh.Length; i++)
+                    {
+                        Profiler.BeginSample("LocalMesh");
+                        DrawTools.DrawLocalMesh(mesh[i].transform, mesh[i].sharedMesh, XKCDColors.Orange);
+                        Profiler.EndSample();
+                    }
                     Profiler.EndSample();
+                }
+            }
+
+            if (joints && mode == Mode.PART)
+            {
+                Profiler.BeginSample("joints");
+                Part part = go.GetComponent<Part>();
+
+                if (part != null)
+                {
+                    if (part.isAttached)
+                    {
+                        DrawTools.DrawJoint(part.attachJoint);
+                    }
                 }
                 Profiler.EndSample();
             }
@@ -567,11 +632,8 @@ namespace DebugStuff
             {
                 GameObject child = go.transform.GetChild(i).gameObject;
 
-                if (child.GetComponent<Part>()) continue;
-                if (child.name == "main camera pivot") continue;
-                if (showActiveOnly && !child.activeInHierarchy) continue;
-
-                DrawObjects(child);
+                if (!child.GetComponent<Part>() && child.name != "main camera pivot")
+                    DrawObjects(child);
             }
             Profiler.EndSample();
         }
@@ -618,6 +680,12 @@ namespace DebugStuff
             bpsf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             
             addButton(buttonPanel.gameObject, "Dump to log", (b) => { print(sb.ToString()); });
+
+            addButton(buttonPanel.gameObject, getSwitchString(activeOnly, "Active Only"), (b) => 
+            {
+                activeOnly = !activeOnly;
+                b.text = getSwitchString(activeOnly, "Active Only");
+            });
 
             //addButton(buttonPanel.gameObject, "List", (b) =>
             //{
@@ -684,12 +752,6 @@ namespace DebugStuff
 
             });
 
-            addButton(buttonPanel.gameObject, GetActiveOnlyString(showActiveOnly), (b) =>
-            {
-                showActiveOnly = !showActiveOnly;
-                b.text = GetActiveOnlyString(showActiveOnly);
-            });
-
 
 
             var switchPanel = addEmptyPanel(panelPos.gameObject);
@@ -735,6 +797,12 @@ namespace DebugStuff
                 b.text = getSwitchString(bounds, "Bounds");
             });
 
+            addButton(switchPanel.gameObject, getSwitchString(joints, "Joints"), (b) =>
+            {
+                joints = !joints;
+                b.text = getSwitchString(joints, "Joints");
+            });
+
             info = addText(panelPos.gameObject, "");
             info.font = monoSpaceFont;
             info.fontSize = 12;
@@ -750,11 +818,6 @@ namespace DebugStuff
         private string getSwitchString(bool state, string label)
         {
             return string.Format("[{0}] {1}", state ? "X" : " ", label);
-        }
-
-        private string GetActiveOnlyString(bool activeOnly)
-        {
-            return activeOnly ? "Active" : "All";
         }
 
         private Button addButton(GameObject parent, string text, UnityAction<Text> click)
