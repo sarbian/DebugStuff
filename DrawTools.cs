@@ -1,3 +1,4 @@
+using System.Reflection;
 using UnityEngine;
 
 public static class DrawTools
@@ -442,6 +443,31 @@ public static class DrawTools
         //Bottom
         DrawLine(end - right, end + right, color);
         DrawLine(end - forward, end + forward, color);
+        GLEnd();
+    }
+
+    private static FieldInfo jointMode;
+
+    public static void DrawJoint(PartJoint joint)
+    {
+        if (joint == null)
+            return;
+
+        if (joint.Host == null || joint.Child == null || joint.Parent == null)
+            return;
+
+        Color col = joint.Host == joint.Child ? Color.blue : Color.red;
+        
+        if (jointMode == null)
+            jointMode = typeof(PartJoint).GetField("mode", BindingFlags.NonPublic | BindingFlags.Instance);
+        
+        float node = ((AttachModes)jointMode.GetValue(joint)) == AttachModes.STACK ? 1 : 0.6f;
+        
+        GLStart();
+        GL.Color(col * node);
+        
+        DrawLine(joint.Child.transform.position, joint.Parent.transform.position, col * node);
+        
         GLEnd();
     }
 }
